@@ -12,6 +12,7 @@ import { GameSession } from '@/engine/session';
 import { useFrameLoop } from '@/hooks/use-frame-loop';
 import { shouldShowInterstitial } from '@/lib/ad-policy';
 import { showInterstitial, showRewarded, useAds } from '@/lib/ads';
+import { trackEvent } from '@/lib/analytics';
 import { feedbackFor } from '@/lib/haptics';
 import { useProgress } from '@/store/progress';
 
@@ -39,12 +40,14 @@ export default function PlayScreen() {
     if (next.status === 'over') {
       roundsEnded.current += 1;
       setNewBest(recordScore(m, session.score));
+      trackEvent('round_end', { mode: m, score: session.score });
     }
   });
 
   const start = () => {
     session.start();
     setSnap(session.snap());
+    trackEvent('round_start', { mode: m });
   };
 
   const playAgain = async () => {
@@ -66,7 +69,10 @@ export default function PlayScreen() {
     setBusy(true);
     const earned = await showRewarded();
     setBusy(false);
-    if (earned && session.continueRun()) setSnap(session.snap());
+    if (earned && session.continueRun()) {
+      setSnap(session.snap());
+      trackEvent('continue_used', { mode: m });
+    }
   };
 
   return (

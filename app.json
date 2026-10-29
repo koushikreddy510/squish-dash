@@ -20,10 +20,14 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "package": "app.squishdash.mobile",
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "googleServicesFile": "./google-services.json"
     },
     "plugins": [
       "expo-router",
+      "@react-native-firebase/app",
+      "@react-native-firebase/analytics",
+      "@react-native-firebase/crashlytics",
       [
         "expo-splash-screen",
         {
@@ -35,7 +39,7 @@
       [
         "react-native-google-mobile-ads",
         {
-          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "androidAppId": "ca-app-pub-1830143198859206~6376957579",
           "iosAppId": "ca-app-pub-3940256099942544~1458002511",
           "userTrackingUsageDescription": "This identifier is used to deliver ads that are more relevant to you."
         }

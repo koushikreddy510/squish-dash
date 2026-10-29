@@ -10,6 +10,8 @@ export default function SettingsScreen() {
   const router = useRouter();
   const haptics = useProgress((s) => s.haptics);
   const setHaptics = useProgress((s) => s.setHaptics);
+  const analyticsEnabled = useProgress((s) => s.analyticsEnabled);
+  const setAnalyticsEnabled = useProgress((s) => s.setAnalyticsEnabled);
   const privacyOptionsRequired = useAds((s) => s.privacyOptionsRequired);
 
   return (
@@ -37,6 +39,13 @@ export default function SettingsScreen() {
             </View>
           </Pressable>
         ) : null}
+        <View style={[styles.row, styles.rowTop]}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.label}>Usage & crash data</Text>
+            <Text style={styles.hint}>Anonymous, helps us fix problems</Text>
+          </View>
+          <Switch value={analyticsEnabled} onValueChange={setAnalyticsEnabled} accessibilityLabel="Usage and crash data" />
+        </View>
       </View>
     </SafeAreaView>
   );

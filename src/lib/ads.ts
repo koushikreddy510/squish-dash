@@ -12,9 +12,8 @@ import { create } from 'zustand';
 /**
  * Ads for Squish Dash. AdMob IDs are client-side identifiers, not secrets.
  *
- * Debug builds always use Google's test units. Release builds read real units
- * from EXPO_PUBLIC_ADMOB_* variables and fall back to the test units, so a
- * build made before the AdMob app exists can never serve a live ad by mistake.
+ * Debug builds always use Google's test units. Release builds use the real
+ * Squish Dash units, which EXPO_PUBLIC_ADMOB_* variables can override.
  * The App ID lives in app.json under the react-native-google-mobile-ads plugin.
  *
  * Placement rules: a banner on menu screens only, a rewarded ad to continue a
@@ -23,9 +22,9 @@ import { create } from 'zustand';
  */
 const env = process.env;
 export const adUnits = {
-  banner: __DEV__ ? TestIds.ADAPTIVE_BANNER : (env.EXPO_PUBLIC_ADMOB_BANNER_ID ?? TestIds.ADAPTIVE_BANNER),
-  interstitial: __DEV__ ? TestIds.INTERSTITIAL : (env.EXPO_PUBLIC_ADMOB_INTERSTITIAL_ID ?? TestIds.INTERSTITIAL),
-  rewarded: __DEV__ ? TestIds.REWARDED : (env.EXPO_PUBLIC_ADMOB_REWARDED_ID ?? TestIds.REWARDED),
+  banner: __DEV__ ? TestIds.ADAPTIVE_BANNER : (env.EXPO_PUBLIC_ADMOB_BANNER_ID ?? 'ca-app-pub-1830143198859206/9192365164'),
+  interstitial: __DEV__ ? TestIds.INTERSTITIAL : (env.EXPO_PUBLIC_ADMOB_INTERSTITIAL_ID ?? 'ca-app-pub-1830143198859206/8811549224'),
+  rewarded: __DEV__ ? TestIds.REWARDED : (env.EXPO_PUBLIC_ADMOB_REWARDED_ID ?? 'ca-app-pub-1830143198859206/4712522110'),
 };
 
 type AdsState = {

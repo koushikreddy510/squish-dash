@@ -84,8 +84,12 @@ describe('ad units', () => {
     });
   });
 
-  it('falls back to test units in release until real ones are configured', () => {
-    expect(loadAds(false).adUnits.rewarded).toBe('test-rewarded');
+  it('uses the real Squish Dash units in release by default', () => {
+    expect(loadAds(false).adUnits).toEqual({
+      banner: 'ca-app-pub-1830143198859206/9192365164',
+      interstitial: 'ca-app-pub-1830143198859206/8811549224',
+      rewarded: 'ca-app-pub-1830143198859206/4712522110',
+    });
   });
 
   it('uses configured units in release builds', () => {

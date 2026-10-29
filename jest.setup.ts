@@ -17,6 +17,19 @@ jest.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'success', Warning: 'warning', Error: 'error' },
 }));
 
+// Firebase is native-only; tests get inert doubles.
+jest.mock('@react-native-firebase/analytics', () => ({
+  getAnalytics: jest.fn(() => ({})),
+  logEvent: jest.fn(() => Promise.resolve()),
+  logScreenView: jest.fn(() => Promise.resolve()),
+  setAnalyticsCollectionEnabled: jest.fn(() => Promise.resolve()),
+}));
+jest.mock('@react-native-firebase/crashlytics', () => ({
+  getCrashlytics: jest.fn(() => ({})),
+  recordError: jest.fn(),
+  setCrashlyticsCollectionEnabled: jest.fn(() => Promise.resolve()),
+}));
+
 // Keep test output readable: React's act() warnings are noise here because
 // zustand settles its persistence on a microtask.
 const originalError = console.error;
