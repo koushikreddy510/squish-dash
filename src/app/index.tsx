@@ -1,98 +1,94 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { AdBanner } from '@/components/ad-banner';
+import { Colors, Radius } from '@/constants/theme';
+import type { Mode } from '@/engine/blob';
+import { useProgress } from '@/store/progress';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+function ModeCard({ mode, title, blurb, best }: { mode: Mode; title: string; blurb: string; best: number }) {
+  const router = useRouter();
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${blurb}. Best ${best}`}
+      onPress={() => router.push({ pathname: '/play', params: { mode } })}
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.cardTitle}>{title}</Text>
+        <Text style={styles.cardBlurb}>{blurb}</Text>
+      </View>
+      <View style={styles.best}>
+        <Text style={styles.bestLabel}>Best</Text>
+        <Text style={styles.bestValue}>{best}</Text>
+      </View>
+    </Pressable>
   );
 }
 
-export default function HomeScreen() {
+export default function MenuScreen() {
+  const router = useRouter();
+  const bestEndless = useProgress((s) => s.bestEndless);
+  const bestWord = useProgress((s) => s.bestWord);
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+    <SafeAreaView style={styles.root}>
+      <View style={styles.hero}>
+        <View style={styles.logoBlob}>
+          <View style={styles.eye} />
+          <View style={[styles.eye, { marginLeft: 16 }]} />
+        </View>
+        <Text style={styles.title}>Squish Dash</Text>
+        <Text style={styles.tagline}>Squeeze through every gap</Text>
+      </View>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+      <View style={styles.cards}>
+        <ModeCard mode="endless" title="Endless" blurb="Fit through the gaps. How far can you go?" best={bestEndless} />
+        <ModeCard mode="word" title="Word mode" blurb="Squeeze through the right letters to spell words" best={bestWord} />
+      </View>
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+      <Pressable accessibilityRole="button" onPress={() => router.push('/settings')} style={styles.settings}>
+        <Text style={styles.settingsLabel}>Settings</Text>
+      </Pressable>
 
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+      <AdBanner />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
+  root: { flex: 1, backgroundColor: Colors.bg, justifyContent: 'space-between' },
+  hero: { alignItems: 'center', paddingTop: 36, gap: 10 },
+  logoBlob: {
+    width: 120,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: Colors.blob,
     flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
   },
-  title: {
-    textAlign: 'center',
+  eye: { width: 12, height: 12, borderRadius: 6, backgroundColor: Colors.blobDark },
+  title: { color: Colors.text, fontSize: 36, fontWeight: '500' },
+  tagline: { color: Colors.muted, fontSize: 15 },
+  cards: { paddingHorizontal: 20, gap: 14 },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.card,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.cardEdge,
+    padding: 18,
+    gap: 12,
   },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
+  cardPressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
+  cardTitle: { color: Colors.text, fontSize: 20, fontWeight: '500' },
+  cardBlurb: { color: Colors.muted, fontSize: 13, marginTop: 4 },
+  best: { alignItems: 'center', minWidth: 48 },
+  bestLabel: { color: Colors.muted, fontSize: 11 },
+  bestValue: { color: Colors.text, fontSize: 22, fontWeight: '500' },
+  settings: { alignSelf: 'center', padding: 12 },
+  settingsLabel: { color: Colors.muted, fontSize: 14 },
 });
