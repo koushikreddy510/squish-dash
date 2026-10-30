@@ -2,11 +2,12 @@
  * Squish Dash rules. Pure TypeScript: no React, no timers, no native modules.
  *
  * The blob keeps a constant area, so squeezing it narrower makes it taller.
- * Walls scroll down with gaps; the blob must fit through a gap and, in word
- * mode, pick the gap that holds the next letter of the current word.
+ * Walls scroll down with gaps; the blob must fit through one. In word mode each
+ * gap holds a letter, thin letters have tight gaps, and the letters the blob
+ * passes through land in a tray that can be banked once they spell a word.
  */
-import { createRng, randInt, shuffled, type Rng } from './rng';
-import { LETTERS, WORDS } from './words';
+import { createRng, randInt, type Rng } from './rng';
+import { LETTER_POOL, TRAY_SIZE, gapWidthForLetter, isWord, MIN_WORD } from './words';
 
 export const WORLD = { width: 300, height: 520 } as const;
 export const BLOB = { area: 3400, minWidth: 34, maxWidth: 120, y: 430 } as const;
@@ -21,8 +22,6 @@ export type Row = {
   id: number;
   y: number;
   gaps: Gap[];
-  /** Index of the gap that counts as correct (always 0 in endless mode). */
-  correct: number;
   resolved: boolean;
   /** The blob touched solid wall while crossing this row. */
   hit: boolean;
@@ -36,8 +35,8 @@ export type GameEvent =
   | { type: 'row-clear' }
   | { type: 'letter' }
   | { type: 'word' }
+  | { type: 'bad-word' }
   | { type: 'hit' }
-  | { type: 'wrong-letter' }
   | { type: 'over' };
 
 export type Game = {
@@ -55,9 +54,8 @@ export type Game = {
   nextRowId: number;
   /** Seconds during which no new row spawns (after a revive). */
   grace: number;
-  words: string[];
-  wordIndex: number;
-  letterIndex: number;
+  /** Letters collected in word mode, oldest first. */
+  tray: string[];
 };
 
 export function widthFromSqueeze(squeeze: number): number {
@@ -93,9 +91,7 @@ export function createGame(mode: Mode, seed: number): Game {
     rowsSpawned: 0,
     nextRowId: 1,
     grace: 0,
-    words: shuffled(rng, WORDS),
-    wordIndex: 0,
-    letterIndex: 0,
+    tray: [],
   };
 }
 
@@ -103,36 +99,32 @@ export function startGame(game: Game): void {
   game.status = 'playing';
 }
 
-/** The k-th letter still needed, counting from the current progress. */
-export function upcomingLetter(game: Game, k: number): string {
-  let wi = game.wordIndex;
-  let li = game.letterIndex;
-  for (let s = 0; s < k; s++) {
-    li++;
-    if (li >= game.words[wi % game.words.length].length) {
-      wi++;
-      li = 0;
+const WORD_GAPS = 3;
+/** Widest total of gaps allowed on a row, so walls never shrink to slivers. */
+const MAX_GAP_TOTAL = 232;
+
+function pickLetters(rng: Rng): string[] {
+  for (;;) {
+    const letters: string[] = [];
+    while (letters.length < WORD_GAPS) {
+      const c = LETTER_POOL[randInt(rng, LETTER_POOL.length)];
+      if (!letters.includes(c)) letters.push(c);
     }
+    if (!letters.some((c) => 'AEIOU'.includes(c)) && rng() < 0.7) continue;
+    const total = letters.reduce((sum, c) => sum + gapWidthForLetter(c), 0);
+    if (total <= MAX_GAP_TOTAL) return letters;
   }
-  return game.words[wi % game.words.length][li];
 }
 
-function decoyLetter(rng: Rng, not: string): string {
-  let c = LETTERS[randInt(rng, LETTERS.length)];
-  while (c === not) c = LETTERS[randInt(rng, LETTERS.length)];
-  return c;
-}
-
-/** Keep the letters on pending rows in step with the player's progress. */
-function relabel(game: Game): void {
-  if (game.mode !== 'word') return;
-  const pending = game.rows.filter((r) => !r.resolved);
-  pending.forEach((row, k) => {
-    const need = upcomingLetter(game, k);
-    row.gaps.forEach((gap, i) => {
-      if (i === row.correct) gap.letter = need;
-      else if (gap.letter === '' || gap.letter === need) gap.letter = decoyLetter(game.rng, need);
-    });
+function wordGaps(rng: Rng): Gap[] {
+  const letters = pickLetters(rng);
+  const widths = letters.map(gapWidthForLetter);
+  const wall = (WORLD.width - widths.reduce((a, b) => a + b, 0)) / (letters.length + 1);
+  let x = wall;
+  return letters.map((letter, i) => {
+    const gap = { cx: x + widths[i] / 2, w: widths[i], letter };
+    x += widths[i] + wall;
+    return gap;
   });
 }
 
@@ -140,21 +132,14 @@ function spawnRow(game: Game): void {
   const idx = game.rowsSpawned++;
   const rng = game.rng;
   let gaps: Gap[];
-  let correct = 0;
   if (game.mode === 'endless') {
     const w = gapWidthFor(idx) * (0.85 + rng() * 0.3);
     const cx = w / 2 + 10 + rng() * (WORLD.width - w - 20);
     gaps = [{ cx, w, letter: '' }];
   } else {
-    const jitter = randInt(rng, 21) - 10;
-    gaps = [
-      { cx: 78 + jitter, w: 64, letter: '' },
-      { cx: 222 + jitter, w: 64, letter: '' },
-    ];
-    correct = randInt(rng, 2);
+    gaps = wordGaps(rng);
   }
-  game.rows.push({ id: game.nextRowId++, y: -16, gaps, correct, resolved: false, hit: false, entered: -1 });
-  relabel(game);
+  game.rows.push({ id: game.nextRowId++, y: -16, gaps, resolved: false, hit: false, entered: -1 });
 }
 
 function loseHeart(game: Game, events: GameEvent[]): void {
@@ -200,31 +185,37 @@ export function step(game: Game, dt: number, input: Input): GameEvent[] {
       else row.entered = gi;
     } else if (row.y - ROW_HALF_THICKNESS >= bottom) {
       row.resolved = true;
-      if (!row.hit && row.entered === row.correct) {
-        if (game.mode === 'endless') {
-          game.score++;
-          events.push({ type: 'row-clear' });
-        } else {
-          game.letterIndex++;
-          events.push({ type: 'letter' });
-          if (game.letterIndex >= game.words[game.wordIndex % game.words.length].length) {
-            game.score++;
-            game.wordIndex++;
-            game.letterIndex = 0;
-            events.push({ type: 'word' });
-          }
-        }
-      } else {
-        events.push({ type: row.hit ? 'hit' : 'wrong-letter' });
+      if (row.hit || row.entered < 0) {
+        events.push({ type: 'hit' });
         loseHeart(game, events);
         if (game.hearts <= 0) return events;
+      } else if (game.mode === 'endless') {
+        game.score++;
+        events.push({ type: 'row-clear' });
+      } else {
+        game.tray.push(row.gaps[row.entered].letter);
+        if (game.tray.length > TRAY_SIZE) game.tray.shift();
+        events.push({ type: 'letter' });
       }
-      relabel(game);
     }
   }
 
   game.rows = game.rows.filter((r) => r.y < WORLD.height + 20);
   return events;
+}
+
+/** Cash in the tray if it spells a word: longer words are worth far more. */
+export function bankWord(game: Game): GameEvent[] {
+  if (game.mode !== 'word' || game.status !== 'playing') return [];
+  const letters = game.tray.join('');
+  if (letters.length < MIN_WORD || !isWord(letters)) return [{ type: 'bad-word' }];
+  game.score += letters.length * letters.length;
+  game.tray = [];
+  return [{ type: 'word' }];
+}
+
+export function clearTray(game: Game): void {
+  game.tray = [];
 }
 
 /** Run the simulation in fixed 1/60 s steps so frame rate never changes the rules. */
@@ -258,7 +249,7 @@ export type Snapshot = {
   hearts: number;
   blob: { x: number; w: number; h: number };
   rows: { id: number; y: number; resolved: boolean; gaps: Gap[] }[];
-  word: { letters: string[]; done: number } | null;
+  word: { tray: string[]; valid: boolean } | null;
 };
 
 /** Plain, immutable view of the game for rendering. */
@@ -275,12 +266,6 @@ export function snapshot(game: Game): Snapshot {
       resolved: r.resolved,
       gaps: r.gaps.map((g) => ({ ...g })),
     })),
-    word:
-      game.mode === 'word'
-        ? {
-            letters: game.words[game.wordIndex % game.words.length].split(''),
-            done: game.letterIndex,
-          }
-        : null,
+    word: game.mode === 'word' ? { tray: [...game.tray], valid: isWord(game.tray.join('')) } : null,
   };
 }

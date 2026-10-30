@@ -5,6 +5,8 @@
 import {
   WORLD,
   advance,
+  bankWord,
+  clearTray,
   createGame,
   revive,
   snapshot,
@@ -54,6 +56,15 @@ export class GameSession {
 
   tick(elapsedSeconds: number): GameEvent[] {
     return advance(this.game, elapsedSeconds, this.input);
+  }
+
+  /** Bank the tray if it spells a word. */
+  bank(): GameEvent[] {
+    return bankWord(this.game);
+  }
+
+  clearTray(): void {
+    clearTray(this.game);
   }
 
   /** A fresh run that starts at once. */

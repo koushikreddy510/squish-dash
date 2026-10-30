@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { GameView } from '@/components/game-view';
 import { Hud } from '@/components/hud';
 import { PillButton } from '@/components/pill-button';
+import { TrayBar } from '@/components/tray-bar';
 import { Colors } from '@/constants/theme';
 import type { Mode } from '@/engine/blob';
 import { GameSession } from '@/engine/session';
@@ -50,6 +51,16 @@ export default function PlayScreen() {
     trackEvent('round_start', { mode: m });
   };
 
+  const bank = () => {
+    session.bank().forEach(feedbackFor);
+    setSnap(session.snap());
+  };
+
+  const clearTray = () => {
+    session.clearTray();
+    setSnap(session.snap());
+  };
+
   const playAgain = async () => {
     if (busy) return;
     setBusy(true);
@@ -84,13 +95,16 @@ export default function PlayScreen() {
       </View>
       <Hud snap={snap} />
       <GameView snap={snap} onTouch={(x, y) => session.touch(x, y)} />
+      {snap.word && snap.status === 'playing' ? (
+        <TrayBar tray={snap.word.tray} valid={snap.word.valid} onBank={bank} onClear={clearTray} />
+      ) : null}
 
       {snap.status === 'ready' ? (
         <View style={styles.overlay}>
           <Text style={styles.title}>{m === 'word' ? 'Word mode' : 'Endless'}</Text>
           <Text style={styles.sub}>
             {m === 'word'
-              ? 'Squeeze through the gap with the next letter'
+              ? 'Pass through gaps to collect letters. Thin letters have tight gaps. Spell a word, then bank it.'
               : 'Drag to move. Drag up to squeeze thin, down to flatten.'}
           </Text>
           <PillButton primary label="Start" onPress={start} />

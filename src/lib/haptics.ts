@@ -16,7 +16,7 @@ export function feedbackFor(event: GameEvent): void {
       run(Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success));
       break;
     case 'hit':
-    case 'wrong-letter':
+    case 'bad-word':
       run(Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning));
       break;
     case 'over':

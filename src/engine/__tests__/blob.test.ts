@@ -1,6 +1,8 @@
 import {
   BLOB,
   advance,
+  bankWord,
+  clearTray,
   blobHeight,
   createGame,
   revive,
@@ -8,13 +10,14 @@ import {
   speedFor,
   startGame,
   step,
-  upcomingLetter,
   widthFromSqueeze,
   type Game,
   type GameEvent,
   type Input,
   type Row,
+  WORLD,
 } from '@/engine/blob';
+import { TRAY_SIZE, gapWidthForLetter } from '@/engine/words';
 
 const FRAME = 1 / 60;
 
@@ -180,68 +183,105 @@ describe('revive', () => {
 });
 
 describe('word mode', () => {
-  it('puts the needed letter in the correct gap and a different letter in the other', () => {
-    const g = started('word', 5);
-    const row = oneRow(g);
-    const need = upcomingLetter(g, 0);
-    expect(row.gaps).toHaveLength(2);
-    expect(row.gaps[row.correct].letter).toBe(need);
-    expect(row.gaps[1 - row.correct].letter).not.toBe(need);
+  it('builds rows of three distinct letters whose gaps match the letter shapes', () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const g = started('word', seed);
+      const row = oneRow(g);
+      expect(row.gaps).toHaveLength(3);
+      expect(new Set(row.gaps.map((x) => x.letter)).size).toBe(3);
+      for (const gap of row.gaps) {
+        expect(gap.w).toBe(gapWidthForLetter(gap.letter));
+        expect(gap.cx - gap.w / 2).toBeGreaterThan(0);
+        expect(gap.cx + gap.w / 2).toBeLessThan(WORLD.width);
+      }
+    }
   });
 
-  it('advances the word when the right gap is taken', () => {
+  it('gives thin letters tight gaps and M or W roomy ones', () => {
+    expect(gapWidthForLetter('I')).toBeLessThan(gapWidthForLetter('A'));
+    expect(gapWidthForLetter('W')).toBeGreaterThan(gapWidthForLetter('A'));
+    expect(gapWidthForLetter('M')).toBeGreaterThan(gapWidthForLetter('A'));
+  });
+
+  it('collects the letter of the gap the blob goes through', () => {
     const g = started('word', 5);
     const row = oneRow(g);
-    const events = runUntilResolved(g, row, aim(g, row, row.correct));
+    const events = runUntilResolved(g, row, aim(g, row, 1));
     expect(events).toContainEqual({ type: 'letter' });
-    expect(g.letterIndex).toBe(1);
+    expect(g.tray).toEqual([row.gaps[1].letter]);
     expect(g.hearts).toBe(3);
   });
 
-  it('costs a heart for the wrong letter without moving on', () => {
+  it('costs a heart and collects nothing when the blob hits a wall', () => {
     const g = started('word', 5);
     const row = oneRow(g);
-    const events = runUntilResolved(g, row, aim(g, row, 1 - row.correct));
-    expect(events).toContainEqual({ type: 'wrong-letter' });
+    g.blob.w = 40;
+    row.y = BLOB.y - 120;
+    const wallX = (row.gaps[0].cx + row.gaps[1].cx) / 2;
+    g.blob.x = wallX;
+    const events = runUntilResolved(g, row, { x: wallX, squeeze: 0.07 });
+    expect(events).toContainEqual({ type: 'hit' });
     expect(g.hearts).toBe(2);
-    expect(g.letterIndex).toBe(0);
+    expect(g.tray).toEqual([]);
   });
 
-  it('scores a word and starts the next once every letter is found', () => {
+  it('keeps only the newest letters when the tray is full', () => {
     const g = started('word', 5);
-    const length = g.words[0].length;
-    g.letterIndex = length - 1;
+    g.tray = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
     const row = oneRow(g);
-    const events = runUntilResolved(g, row, aim(g, row, row.correct));
-    expect(events).toContainEqual({ type: 'word' });
-    expect(g.score).toBe(1);
-    expect(g.wordIndex).toBe(1);
-    expect(g.letterIndex).toBe(0);
+    runUntilResolved(g, row, aim(g, row, 0));
+    expect(g.tray).toHaveLength(TRAY_SIZE);
+    expect(g.tray[0]).toBe('B');
+    expect(g.tray[TRAY_SIZE - 1]).toBe(row.gaps[0].letter);
   });
 
-  it('keeps later rows consistent with the order of letters still needed', () => {
-    const g = started('word', 9);
-    advance(g, 2, { x: 150, squeeze: 0.3 });
-    const pending = g.rows.filter((r) => !r.resolved);
-    pending.forEach((row, k) => {
-      expect(row.gaps[row.correct].letter).toBe(upcomingLetter(g, k));
-    });
+  it('banks a real word for length squared and empties the tray', () => {
+    const g = started('word', 5);
+    g.tray = ['S', 'U', 'N'];
+    expect(bankWord(g)).toEqual([{ type: 'word' }]);
+    expect(g.score).toBe(9);
+    expect(g.tray).toEqual([]);
+
+    g.tray = ['S', 'T', 'A', 'R'];
+    bankWord(g);
+    expect(g.score).toBe(9 + 16);
   });
 
-  it('wraps to the next word when looking ahead', () => {
-    const g = started('word', 3);
-    const first = g.words[0];
-    g.letterIndex = first.length - 1;
-    expect(upcomingLetter(g, 1)).toBe(g.words[1][0]);
+  it('keeps the tray when it is not a word', () => {
+    const g = started('word', 5);
+    g.tray = ['Q', 'Z', 'X'];
+    expect(bankWord(g)).toEqual([{ type: 'bad-word' }]);
+    expect(g.score).toBe(0);
+    expect(g.tray).toEqual(['Q', 'Z', 'X']);
+    g.tray = ['A', 'T'];
+    expect(bankWord(g)).toEqual([{ type: 'bad-word' }]);
+  });
+
+  it('does not bank outside word mode or after the run ends', () => {
+    const e = started('endless', 1);
+    e.tray = ['S', 'U', 'N'];
+    expect(bankWord(e)).toEqual([]);
+    const g = started('word', 1);
+    g.tray = ['S', 'U', 'N'];
+    g.status = 'over';
+    expect(bankWord(g)).toEqual([]);
+    expect(g.score).toBe(0);
+  });
+
+  it('clears the tray on request', () => {
+    const g = started('word', 1);
+    g.tray = ['A', 'B'];
+    clearTray(g);
+    expect(g.tray).toEqual([]);
   });
 });
 
 describe('snapshot', () => {
-  it('describes the word to show in word mode', () => {
+  it('describes the tray in word mode and whether it spells a word', () => {
     const g = started('word', 5);
-    const snap = snapshot(g);
-    expect(snap.word?.letters.join('')).toBe(g.words[0]);
-    expect(snap.word?.done).toBe(0);
+    expect(snapshot(g).word).toEqual({ tray: [], valid: false });
+    g.tray = ['C', 'A', 'T'];
+    expect(snapshot(g).word).toEqual({ tray: ['C', 'A', 'T'], valid: true });
   });
 
   it('has no word in endless mode', () => {

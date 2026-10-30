@@ -22,7 +22,7 @@ describe('feedbackFor', () => {
 
   it('warns on a hit or a wrong letter, and signals the end of the run', () => {
     feedbackFor({ type: 'hit' });
-    feedbackFor({ type: 'wrong-letter' });
+    feedbackFor({ type: 'bad-word' });
     feedbackFor({ type: 'over' });
     expect(Haptics.notificationAsync).toHaveBeenCalledWith('warning');
     expect(Haptics.notificationAsync).toHaveBeenCalledWith('error');

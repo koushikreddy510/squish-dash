@@ -58,4 +58,15 @@ describe('GameSession', () => {
     b.tick(2);
     expect(a.snap().rows).toEqual(b.snap().rows);
   });
+
+  it('banks and clears the tray through the session', () => {
+    const s = new GameSession('word', () => 1);
+    s.start();
+    s.game.tray = ['C', 'A', 'T'];
+    expect(s.bank()).toEqual([{ type: 'word' }]);
+    expect(s.score).toBe(9);
+    s.game.tray = ['X'];
+    s.clearTray();
+    expect(s.game.tray).toEqual([]);
+  });
 });
