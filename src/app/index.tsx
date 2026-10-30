@@ -45,7 +45,7 @@ export default function MenuScreen() {
 
       <View style={styles.cards}>
         <ModeCard mode="endless" title="Endless" blurb="Fit through the gaps. How far can you go?" best={bestEndless} />
-        <ModeCard mode="word" title="Word mode" blurb="Squeeze through the right letters to spell words" best={bestWord} />
+        <ModeCard mode="word" title="Word mode" blurb="Collect letters from the gaps and bank words" best={bestWord} />
       </View>
 
       <Pressable accessibilityRole="button" onPress={() => router.push('/settings')} style={styles.settings}>

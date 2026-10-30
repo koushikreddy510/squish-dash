@@ -20,8 +20,8 @@ export function TrayBar({ tray, valid, onBank, onClear }: Props) {
         accessibilityLabel={tray.length ? `Tray: ${tray.join('')}` : 'Tray is empty'}>
         <Text style={[styles.letters, valid && { color: Colors.good }]}>{tray.join('')}</Text>
       </View>
-      <PillButton primary={valid} label="Bank" onPress={onBank} />
-      <PillButton label="Clear" onPress={onClear} />
+      <PillButton compact primary={valid} label="Bank" onPress={onBank} />
+      <PillButton compact label="Clear" onPress={onClear} />
     </View>
   );
 }
